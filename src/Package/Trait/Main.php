@@ -215,7 +215,6 @@ trait Main {
         $list = $repository->findBy([
             'name' => self::EXTENSIONS,
         ]);
-        dd($list->count());
         $list_application = [];
         foreach($list as $nr => $extension){
             $applications = $extension->getApplications();
