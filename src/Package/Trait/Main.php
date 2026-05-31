@@ -212,9 +212,10 @@ trait Main {
         }
         $connection->manager = Database::entity_manager($object, $config, $connection);
         $repository = $connection->manager->getRepository('\\Entity\\Extension');
-        $list =$repository->findBy([
+        $list = $repository->findBy([
             'name' => self::EXTENSIONS,
         ]);
+        dd($list->count());
         $list_application = [];
         foreach($list as $nr => $extension){
             $applications = $extension->getApplications();
