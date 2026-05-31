@@ -4,6 +4,7 @@ namespace Package\Raxon\Photoviewer\Trait;
 use Raxon\App;
 use Raxon\Config;
 
+use Raxon\Doctrine\Module\Database;
 use Raxon\Exception\DirectoryCreateException;
 
 use Raxon\Module\Cli;
@@ -19,6 +20,15 @@ use Exception;
 
 trait Main {
     const NAME = 'Photoviewer';
+
+    const EXTENSIONS = [
+        'gif',
+        'bmp',
+        'jpg',
+        'jpeg',
+        'png',
+        'webp',
+    ];
     /**
      * @throws DirectoryCreateException
      * @throws Exception
@@ -189,7 +199,52 @@ trait Main {
                 }                
             }
         }
-        //add application and extensions like videoplayer
+        if(!property_exists($options, 'environment')){
+            $options->environment = $object->config('framework.environment');
+        }
+        if(!property_exists($options, 'connection')){
+            $options->connection = 'system';
+        }
+        $config = Database::config($object);
+        $connection = $object->config('doctrine.environment.' . $options->connection . '.' . $options->environment);
+        if($connection === null){
+            $connection = $object->config('doctrine.environment.' . $options->connection . '.' . '*');
+        }
+        $connection->manager = Database::entity_manager($object, $config, $connection);
+        $repository = $connection->manager->getRepository('\\Entity\\Extension');
+        $list =$repository->findBy([
+            'name' => self::EXTENSIONS,
+        ]);
+        $list_application = [];
+        foreach($list as $nr => $extension){
+            $applications = $extension->getApplications();
+            d($extension->getName());
+            foreach($applications as $application){
+                $list_application[] = $application->getName();
+            }
+            if(!in_array(self::NAME, $list_application, true)){
+                //adding application to the extension and add extensions to the application
+                $repository = $connection->manager->getRepository('\Entity\Application');
+                $application_url = '{{route.get(\'application-photo-viewer\')}}';
+                $entity_application = $repository->findOneBy([
+                    'url' => $application_url
+                ]);
+                if(!$entity_application){
+                    $entity_application = new \Entity\Application();
+                    $entity_application->setUrl('{{route.get(\'application-photo-viewer\')}}');
+                    $entity_application->setName(self::NAME);
+                    $entity_application->iconUrl('/Application/Photoviewer/Icon/Icon.png');
+                    $entity_application->setExtensions($list);
+                    $connection->manager->persist($entity_application);
+                } else {
+                    $entity_application->setExtensions($list);
+                    $connection->manager->persist($entity_application);
+                }
+                $extension->addApplication($entity_application);
+                $connection->manager->persist($extension);
+                $connection->manager->flush();
+            }
+        }
         $command = 'app install raxon/account -patch';
         Core::execute($object, $command, $output, $notification);
         if($output){
